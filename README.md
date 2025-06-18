@@ -1,0 +1,1 @@
+This program will gather information from review websites and give them to the user. The user will be able to specify which website they want, and will be able to receive all related reviews. There will be an overall score given to the website based on the reviews which can inform the user whether it is worthy to spend their time on.
