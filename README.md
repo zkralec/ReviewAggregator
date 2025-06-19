@@ -1,1 +1,2 @@
-This program will gather information from review websites and give them to the user. The user will be able to specify which website they want, and will be able to receive all related reviews. There will be an overall score given to the website based on the reviews which can inform the user whether it is worthy to spend their time on.
+# Review Aggregator
+This tool scrapes customer reviews from Trustpilot for any website — including brands like Amazon, Nike, and Temu. It calculates the average star rating using custom scraping and parsing logic. It was a fun way to combine web scraping and simple sentiment analysis in a practical way.
