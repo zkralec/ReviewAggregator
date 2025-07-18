@@ -19,7 +19,7 @@ def avg_review(rating_list):
         return round(sum / len(rating_list), 2)
 
 # Prompt user for the company they want to review
-web_name = input('\n\nPlease enter weblink of the company you want reviews for.\nNote, quick back to back requests can cause issues. \n\nEx. amazon.com \n    nike.com \n    temu.com \n\nYour selection: ')
+web_name = input('\n\nPlease enter the weblink of the company you want reviews for.\nNote, quick back to back requests can cause issues. \n\nEx. amazon.com \n    nike.com \n    temu.com \n\nYour selection: ')
 
 # GET request
 url = 'https://www.trustpilot.com/review/' + web_name
