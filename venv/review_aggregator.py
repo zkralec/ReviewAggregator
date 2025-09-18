@@ -1,26 +1,30 @@
 import requests
 import csv
-
+import re
+import time
 from bs4 import BeautifulSoup
-
 from urllib.parse import urljoin
 
 # Method for calculating average review
 def avg_review(rating_list):
-
-    sum = 0
 
     # Edge case for no reviews
     if not rating_list:
         print("\nNo ratings to average.\n")
         return
     else:
-        for i in rating_list:
-            sum += i
-        return round(sum / len(rating_list), 2)
+        return round(sum(rating_list) / len(rating_list), 2)
+
+# Method for safely getting text
+def safe_text(node):
+    return node.get_text(strip=True) if node else "N/A"
+
+# Regex for pulling the number out of alt="Rated X out of 5"
+RATING_ALT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*out\s*of\s*5", re.I)
 
 # Prompt user for the company they want to review
 web_name = input('\n\nPlease enter the weblink of the company you want reviews for.\nNote, quick back to back requests can cause issues. \n\nEx. amazon.com \n    nike.com \n    temu.com \n\nYour selection: ')
+web_name = web_name.strip().lstrip("/")
 
 # GET request
 url = 'https://www.trustpilot.com/review/' + web_name
@@ -67,22 +71,22 @@ review_file = open('reviews.csv', mode='w', newline='', encoding='utf-8')
 writer = csv.writer(review_file)
 writer.writerow(['Author', 'Rating', 'Review'])
 
-# Initializing temp href
-href = 'temp'
-
 # Initializing counter for reviews scraped
 num_reviews = 0
 
 # Initializing list for all ratings
 rating_list = []
 
-while href is not None:
+while True:
 
-    # Get review block
-    review_block = soup.find_all('div', class_='styles_cardWrapper__g8amG styles_show__Z8n7u')
+    # Each review is inside an article with this attribute
+    review_cards = soup.select('article[data-service-review-card-paper="true"]')
 
-    # Getting each review, author, and rating in block
-    for i in review_block:
+    # Fallback in case the above changes
+    if not review_cards:
+        review_cards = soup.find_all('div', class_=re.compile(r'^styles_cardWrapper__'))
+
+    for card in review_cards:
 
         # End program if number of reviews satisfies user selection
         if num_reviews >= max_reviews:
@@ -91,24 +95,51 @@ while href is not None:
             print('✅ DONE: Check the "reviews.csv" file for all scraped reviews.\n')
             exit()
 
-        # Getting desired text for author, rating, and review from the block
-        author = i.find('span', class_='typography_heading-xs__osRhC typography_appearance-default__t8iAq').get_text()
-        rating_tag = i.find('div', class_='star-rating_starRating__sdbkn star-rating_medium__Oj7C9').find('img')
-        rating = rating_tag.get('alt') if rating_tag else 'N/A'
-        review_tag = i.find('p', class_='typography_body-l__v5JLj typography_appearance-default__t8iAq')
-        review = review_tag.get_text() if review_tag else 'N/A'
+        # Getting author
+        author = "N/A"
+        author_label = card.select_one('aside[aria-label^="Info for"]')
+        if author_label:
+            author = safe_text(author_label)
+        if author == "N/A":
+            author_link = card.find('a', href=re.compile(r'/users/'))
+            if author_link:
+                author = safe_text(author_link)
+        if author == "N/A":
+            author_span = card.find('span', class_=re.compile(r'^typography_heading-xs__'))
+            if author_span:
+                author = safe_text(author_span)
+
+        # Getting rating
+        rating_value = None
+        rating_img = card.select_one('img[alt*="out of 5" i]')
+        if rating_img and rating_img.has_attr('alt'):
+            m = RATING_ALT_RE.search(rating_img['alt'])
+            if m:
+                try:
+                    rating_value = float(m.group(1))
+                except ValueError:
+                    rating_value = None
+
+        # Getting review text
+        review = "N/A"
+        review_node = card.select_one('[class*="reviewText"]')
+        if review_node:
+            review = safe_text(review_node)
+        if review == "N/A":
+            ps = card.find_all('p')
+            if ps:
+                review = max((p.get_text(strip=True) for p in ps), key=len, default="N/A")
 
         # Adding each rating to the list
-        rating_list.append(float(rating[6]))
+        if rating_value is not None:
+            rating_list.append(rating_value)
 
         # Write to file and increase reviews found
-        writer.writerow([author, rating, review])
+        writer.writerow([author, rating_value if rating_value is not None else "N/A", review])
         num_reviews += 1
 
     # Getting the href for the next page
     href = soup.find('a', rel='next')
-
-    # Edge case for certain pages
     if not href:
         href = soup.find('a', attrs={'aria-label': 'Next page'})
 
@@ -116,9 +147,12 @@ while href is not None:
     if href and href.get('href'):
         next_page_url = urljoin(url, href['href'])
         response = requests.get(next_page_url, headers=headers)
+        if response.status_code != 200:
+            break
         soup = BeautifulSoup(response.text, 'html.parser')
+        time.sleep(0.8)
     else:
-        href = None
+        break
 
 # Closing the CSV file and final print statements
 review_file.close()
