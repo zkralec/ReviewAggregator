@@ -10,6 +10,7 @@ def avg_review(rating_list):
 
     sum = 0
 
+    # Edge case for no reviews
     if not rating_list:
         print("\nNo ratings to average.\n")
         return
